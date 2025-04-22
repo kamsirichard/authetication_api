@@ -22,7 +22,7 @@ class Constants
      * Database name
      * @var string
      */
-    const DB_NAME = 'attendee';
+    const DB_NAME = 'data_01';
     const LIVE_DB_NAME = ' ';
     
     /**
@@ -49,7 +49,7 @@ class Constants
 	// App base url, main ho,e page link
     const BASE_URL = "http://localhost/savertech/";
     const LIVE_BASE_URL = "";
-	const APP_NAME = "Attendee";
+	const APP_NAME = "Airtime";
     const CURRENT_VERSION = "1.0";// where all assets is
 
 }
