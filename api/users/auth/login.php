@@ -8,23 +8,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $data = json_decode($request_body);
 
     $email = isset($data->email) ? $utility_class_call::escape($data->email) : "";
-    $password = isset($data->password) ? $utility_class_call::escape($data->password) : "";
+    $password = "";
+    if (isset($data->password)) {
+        $password = $utility_class_call::escape($data->password);
+    }
 
-    // Validate input
+   // Validate input
     if (
-        !$utility_class_call::validateEmail($email) ||
-        !$utility_class_call::validate_input($password)
+       !$utility_class_call::validateEmail($email) ||
+       $utility_class_call::validate_input($password)
     ) {
-        $text = $api_response_class_call::$invalidUserDetail;
-        $errorcode = $api_error_code_class_call::$internalUserWarning;
-        $maindata = [];
-        $hint = ["Ensure to send valid data to the API fields."];
-        $linktosolve = "https://";
+       $text = $api_response_class_call::$invalidUserDetail;
+       $errorcode = $api_error_code_class_call::$internalUserWarning;
+       $maindata = [];
+       $hint = ["Ensure to send valid data to the API fields."];
+       $linktosolve = "https://";
         $api_status_code_class_call->respondBadRequest($maindata, $text, $hint, $linktosolve, $errorcode);
     }
 
     // Check if user exists
-    $user = $api_users_table_class_call::getUserByIdOrEmail($email);
+    $user = $api_users_table_class_call::getUserByEmail($email);
     if (count($user) == 0) {
         $text = $api_response_class_call::$invalidUserDetail;
         $errorcode = $api_error_code_class_call::$internalUserWarning;
@@ -35,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 
     // Verify password
-    if (!password_verify($password, $user["user_password"])) {
+    if (!password_verify($password, $user["password"])) {
         $text = $api_response_class_call::$passwordIncorrect;
         $errorcode = $api_error_code_class_call::$internalUserWarning;
         $maindata = [];
@@ -66,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     // ✅ Generate JWT token
     $userPubkey = $user["pub_key"];
-    $userid = $user["user_id"];
+    $userid = $user["id"];
     $sendToEmail = $user["email"];
     $token = $api_status_code_class_call->getTokenToSendAPI($userPubkey);
 

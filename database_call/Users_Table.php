@@ -2,8 +2,11 @@
 
 namespace DatabaseCall;
 
-use Config;
 
+use Config;
+    use Config\Utility_Functions;
+    use Config\Constants;
+    use Config\DB_Connect;
 /**
  * Post model
  *
@@ -22,25 +25,48 @@ class Users_Table extends Config\DB_Connect
 
      */
     // APi functions
-    public static function insertUser($userid, $password, $email, $fullname)
+    public static function insertUser($username, $password, $email, $firstname, $lastname, $accountno, $bankname, $phoneNo, $referrer)
+    {
+        $connect = static::getDB();
+
+        // Generate a unique public key for the user
+        $user_pub_key = Utility_Functions::generateUniquePubKey("users", "pub_key");
+
+        // Generate a unique referral code
+        $referral_code = self::generateUniqueReferralCode($connect);
+
+        // Prepare the SQL statement with referral_code included
+        $insertUser = $connect->prepare("
+            INSERT INTO users 
+            (username, password, user_Email, first_Name, last_Name, account_No, bankname, phoneNo, referred_by, pub_key, referral_code)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+
+        $insertUser->bind_param("sssssssssss", $username, $password, $email, $firstname, $lastname, $accountno, $bankname, $phoneNo, $referrer, $user_pub_key, $referral_code);
+
+        if ($insertUser->execute()) {
+            return $connect->insert_id;
+        } else {
+            return false;
+        }
+    }
+
+        private static function generateUniqueReferralCode($connect, $length = 8)
         {
-            // Input type checks if its from post request or just normal function call
-            $connect = static::getDB();
+            do {
+                $characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                $code = '';
+                for ($i = 0; $i < $length; $i++) {
+                    $code .= $characters[random_int(0, strlen($characters) - 1)];
+                }
 
-            // Prepare the SQL statement for inserting a new user
-            $insertUser = $connect->prepare("INSERT INTO users (user_id, user_password, email, fullname) VALUES (?, ?, ?, ?)");
+                $stmt = $connect->prepare("SELECT id FROM users WHERE referral_code = ?");
+                $stmt->bind_param("s", $code);
+                $stmt->execute();
+                $stmt->store_result();
+            } while ($stmt->num_rows > 0);
 
-            // Bind parameters and values
-            $insertUser->bind_param("isss", $userid, $password, $email, $fullname);
-
-            // Execute the insert query
-            if ($insertUser->execute()) {
-                // Return the ID of the newly inserted user
-                return $connect->insert_id;
-            } else {
-                // Handle the case where the insert query fails (e.g., return an error code or message)
-                return false;
-            }
+            return $code;
         }
 
     public static function removeUser($email)
@@ -84,57 +110,16 @@ class Users_Table extends Config\DB_Connect
                 return false;
             }
         }
-    public static function insertSuperAdminUser($password, $email)
-        {
-            // Input type checks if its from post request or just normal function call
-            $connect = static::getDB();
-
-            // Prepare the SQL statement for inserting a new user
-            $insertAdminUser = $connect->prepare("INSERT INTO superadmins (ad_password, email) VALUES (?, ?)");
-
-            // Bind parameters and values
-            $insertAdminUser->bind_param("ss", $password, $email);
-
-            // Execute the insert query
-            if ($insertAdminUser->execute()) {
-                // Return the ID of the newly inserted user
-                return $connect->insert_id;
-            } else {
-                // Handle the case where the insert query fails (e.g., return an error code or message)
-                return false;
-            }
-        }
-
-        public static function insertCompany($company_name, $company_details, $email)
-        {
-            // Input type checks if its from post request or just normal function call
-            $connect = static::getDB();
-
-            // Prepare the SQL statement for inserting a new user
-            $insertUser = $connect->prepare("INSERT INTO companies (company_name, company_details, company_email) VALUES (?, ?, ?)");
-
-            // Bind parameters and values
-            $insertUser->bind_param("sss", $company_name, $company_details, $email);
-
-            // Execute the insert query
-            if ($insertUser->execute()) {
-                // Return the ID of the newly inserted user
-                return $connect->insert_id;
-            } else {
-                // Handle the case where the insert query fails (e.g., return an error code or message)
-                return false;
-            }
-        }
-          
-    public static function getUserByUsername($user_id= "",$data="*")
+   
+    public static function getUserByUsername($username= "",$data="*")
         {
             //input type checks if its from post request or just normal function call
             $connect = static::getDB();
             $alldata = [];
 
             $data = is_string($data) ? $data : "*";
-            $checkdata = $connect->prepare("SELECT $data FROM users WHERE user_id = ?");
-            $checkdata->bind_param("i", $user_id);
+            $checkdata = $connect->prepare("SELECT $data FROM users WHERE username = ?");
+            $checkdata->bind_param("s", $username);
             $checkdata->execute();
             $getresultemail = $checkdata->get_result();
             if ($getresultemail->num_rows > 0) {
@@ -144,15 +129,15 @@ class Users_Table extends Config\DB_Connect
             return $alldata;
 
         }
-    public static function getCompanyByName($fullname= "",$data="*")
+        public static function getUserByPhoneNo($phoneNO= "",$data="*")
         {
             //input type checks if its from post request or just normal function call
             $connect = static::getDB();
             $alldata = [];
 
             $data = is_string($data) ? $data : "*";
-            $checkdata = $connect->prepare("SELECT $data FROM companies WHERE company_name = ?");
-            $checkdata->bind_param("s", $fullname);
+            $checkdata = $connect->prepare("SELECT $data FROM users WHERE phoneNo = ?");
+            $checkdata->bind_param("s", $phoneNO);
             $checkdata->execute();
             $getresultemail = $checkdata->get_result();
             if ($getresultemail->num_rows > 0) {
@@ -162,25 +147,7 @@ class Users_Table extends Config\DB_Connect
             return $alldata;
 
         }
-    public static function checkIfIsSuperAdmin($user_pubkey, $data="*")
-        {
-            //input type checks if its from post request or just normal function call
-            $connect = static::getDB();
-            $alldata = [];
 
-            $data = is_string($data) ? $data : "*";
-            $checkdata = $connect->prepare("SELECT $data FROM superadmins WHERE pub_key = ?");
-            $checkdata->bind_param("s", $user_pubkey);
-            $checkdata->execute();
-            $getresultemail = $checkdata->get_result();
-            if ($getresultemail->num_rows > 0) {
-                $getthedata = $getresultemail->fetch_assoc();
-                $alldata = $getthedata;
-            }
-            return $alldata;
-
-        }
-        
     public static function checkIfIsAdmin($user_pubkey, $data="*")
         {
             //input type checks if its from post request or just normal function call
@@ -218,41 +185,7 @@ class Users_Table extends Config\DB_Connect
         
             return $alldata;
         }
-        public static function latitudeSelector($company_id, &$company_latitude)
-        {
-            // Input type checks if it's from a post request or just a normal function call
-            $connect = static::getDB();
-            $alldata = [];
-
-            $checkdata = $connect->prepare("SELECT company_latitude FROM companies WHERE company_id = ?");
-            $checkdata->bind_param("i", $company_id);  // Bind the parameter and specify its type (i for integer)
-            $checkdata->execute();
-            $getresult = $checkdata->get_result();
-
-            if ($getresult->num_rows > 0) {
-                $getthedata = $getresult->fetch_assoc();
-                $company_latitude = $getthedata['company_latitude'];
-            }
-            return $company_latitude;
-        }
-
-        public static function longitudeSelector($company_id, &$company_longitude)
-        {
-            // Input type checks if it's from a post request or just a normal function call
-            $connect = static::getDB();
-
-            $checkdata = $connect->prepare("SELECT company_longitude FROM companies WHERE company_id = ?");
-            $checkdata->bind_param("i", $company_id);  // Bind the parameter and specify its type (i for integer)
-            $checkdata->execute();
-            $getresult = $checkdata->get_result();
-
-            if ($getresult->num_rows > 0) {
-                $getthedata = $getresult->fetch_assoc();
-                $company_longitude = $getthedata['company_longitude'];
-            }
-            return $company_longitude;
-        }
-
+     
     public static function getUserByEmail($email= "",$data="*")
         {
             //input type checks if its from post request or just normal function call
@@ -260,7 +193,7 @@ class Users_Table extends Config\DB_Connect
             $alldata = [];
 
             $data = is_string($data) ? $data : "*";
-            $checkdata = $connect->prepare("SELECT $data FROM users WHERE email = ?");
+            $checkdata = $connect->prepare("SELECT $data FROM users WHERE user_Email = ?");
             $checkdata->bind_param("s", $email);
             $checkdata->execute();
             $getresultemail = $checkdata->get_result();
@@ -307,24 +240,7 @@ class Users_Table extends Config\DB_Connect
             return $alldata;
 
         }
-    public static function getCompanyByEmail($email= "",$data="*")
-        {
-            //input type checks if its from post request or just normal function call
-            $connect = static::getDB();
-            $alldata = [];
-
-            $data = is_string($data) ? $data : "*";
-            $checkdata = $connect->prepare("SELECT $data FROM companies WHERE company_email = ?");
-            $checkdata->bind_param("s", $email);
-            $checkdata->execute();
-            $getresultemail = $checkdata->get_result();
-            if ($getresultemail->num_rows > 0) {
-                $getthedata = $getresultemail->fetch_assoc();
-                $alldata = $getthedata;
-            }
-            return $alldata;
-
-        }
+  
     public static function getAdminUserByUsername($admin_id= "",$data="*")
         {
             //input type checks if its from post request or just normal function call
@@ -361,30 +277,13 @@ class Users_Table extends Config\DB_Connect
             return $alldata;
 
         }
-    public static function getSuperAdminUserByEmail($email= "",$data="*")
-        {
-            //input type checks if its from post request or just normal function call
-            $connect = static::getDB();
-            $alldata = [];
-
-            $data = is_string($data) ? $data : "*";
-            $checkdata = $connect->prepare("SELECT $data FROM superadmins WHERE email = ?");
-            $checkdata->bind_param("s", $email);
-            $checkdata->execute();
-            $getresultemail = $checkdata->get_result();
-            if ($getresultemail->num_rows > 0) {
-                $getthedata = $getresultemail->fetch_assoc();
-                $alldata = $getthedata;
-            }
-            return $alldata;
-
-        }
+   
         public static function getUserByIdOrEmail($user_id= ""){
             //input type checks if its from post request or just normal function call
             $connect = static::getDB();
             $alldata = [];
     
-            $checkdata = $connect->prepare("SELECT  * FROM users WHERE user_id = ? || email=?");
+            $checkdata = $connect->prepare("SELECT  * FROM users WHERE id = ? || user_Email=?");
             $checkdata->bind_param("ss", $user_id, $user_id);
             $checkdata->execute();
             $getresultemail = $checkdata->get_result();
@@ -411,22 +310,7 @@ class Users_Table extends Config\DB_Connect
             return $alldata;
     
         }
-        public static function getSuperAdminUserByIdorEmail($admin_id = ""){
-            //input type checks if its from post request or just normal function call
-            $connect = static::getDB();
-            $alldata = [];
-    
-            $checkdata = $connect->prepare("SELECT  * FROM superadmins WHERE admin_id = ? || email=?");
-            $checkdata->bind_param("ss", $admin_id, $admin_id);
-            $checkdata->execute();
-            $getresultemail = $checkdata->get_result();
-            if ($getresultemail->num_rows > 0) {
-                $getthedata = $getresultemail->fetch_assoc();
-                $alldata = $getthedata;
-            }
-            return $alldata;
-    
-        }
+ 
     public static function editUserProfile($user_id, $fullname, $department, $gender)
         {
             // Input type checks if it's from a post request or just a normal function call
@@ -452,7 +336,7 @@ class Users_Table extends Config\DB_Connect
                     
         
             // Prepare the SQL statement for updating the user's password
-            $updatePassword = $connect->prepare("UPDATE users SET user_password = ? WHERE pub_key = ?");
+            $updatePassword = $connect->prepare("UPDATE users SET password = ? WHERE pub_key = ?");
         
             // Bind parameters and values
             $updatePassword->bind_param("ss", $hashPassword, $user_pubkey);
@@ -493,7 +377,7 @@ class Users_Table extends Config\DB_Connect
                 $connect = static::getDB();
 
                 // Prepare the SQL statement for updating the user profile with a reset code
-                $storeResetCode = $connect->prepare("UPDATE users SET reset_code = ?, reset_code_expires_at = ? WHERE email = ?");
+                $storeResetCode = $connect->prepare("UPDATE users SET passwordResetCode = ?, passwordResetCodeExpires = ? WHERE email = ?");
 
                 // Bind parameters and values
                 $storeResetCode->bind_param("sss", $code, $expiry, $email);
@@ -512,7 +396,7 @@ class Users_Table extends Config\DB_Connect
                 $connect = static::getDB();
             
                 // Prepare the SQL statement for fetching the reset code and expiration time
-                $getResetCode = $connect->prepare("SELECT reset_code FROM users WHERE email = ?");
+                $getResetCode = $connect->prepare("SELECT passwordResetCode FROM users WHERE email = ?");
             
                 // Bind the email parameter
                 $getResetCode->bind_param("s", $email);
@@ -582,4 +466,4 @@ class Users_Table extends Config\DB_Connect
             }
             
        
-}    
+}
