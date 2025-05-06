@@ -27,6 +27,7 @@ class API_User_Response
     public static $unauthorized_token="Unauthorized user";
     public static $userExists="Username already exists";
     public static $phoneExists = "Phone number already exists";
+    public static $phoneNotVerified = "Phone number not verified";
     public static $companyExists="Company already exists";
     public static $userNotExist="User does not exist";
     public static $emailExists="Email Already exists";
@@ -49,6 +50,7 @@ class API_User_Response
     public static $weakPassword = "Password not strong enough";
     public static $confirmPassword = "Passwords are not matched";
     public static $invalidEmail = "Invalid Email";
+    public static $emailNotVerified = "Email not verified";
     public static $invalidResetData = "Code Invalid";
     public static $resetCodeVerified = "Code is verified";
     public static $resetCodeEmailSent= "Password Reset sent to email successfully";
